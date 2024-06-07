@@ -103,6 +103,12 @@ fact HRConnected {
 }
 
 
+// restricao nao tem numero
+fact StartIsTop { // dá erro
+  //Model.top in StartEvent
+
+}
+
 // restricao 2
 fact CondSimple {
   lone XORGateway.Cond[C]
@@ -113,16 +119,72 @@ fact ExcpSimple {
   lone IntermediateEvent.Excp
 }
 
-// restricao 4 
+
+
+// restricao 4.1
 fact StartiInOut {
   no  ControlFlow.StartEvent
   one StartEvent.ControlFlow
 }
-// restricao nao tem numero
-fact StartIsTop { // dá erro
-  Model.top in StartEvent
+// restricao 4.2 - para onde a exceção me leva não pode ter outras entradas
+fact ExcpInOut {
+  all ie : IntermediateEvent | all ie2: Excp.(Activity - ie.Excp) | no ie2 -> ie.Excp
 
 }
+
+// 5. $forall s in "EndEvent", "out"(s) = emptyset and abs("in"(s)) = 1$
+fact EndEventInOut {
+	one ControlFlow.EndEvent 
+	no EndEvent.ControlFlow
+}
+
+// 6 .1 
+fact ActivityInOut {
+	one ControlFlow.Activity 
+	one Activity.ControlFlow
+}
+
+// 6.2
+fact IntermidiateEvent{
+  all i : Excp.(Activity - IntermediateEvent.Excp) 
+  		| one ControlFlow.i and one i.ControlFlow
+}
+
+// 7.1
+fact ForkGatewayInOut { // não sei porque não consegui por em pointfree
+  all f:ForkGateway | one ControlFlow.f and some f.ControlFlow
+}
+
+// 7.2
+fact XORGatewayInOut { // não sei porque não consegui por em pointfree
+  all f:XORGateway | one ControlFlow.f and some f.ControlFlow
+}
+
+// 7.3
+fact EventGatewayInOut { // não sei porque não consegui por em pointfree
+  all f:EventGateway | one ControlFlow.f and some f.ControlFlow
+}
+//8.1
+
+fact JoinGatewayInOut { // não sei porque não consegui por em pointfree
+  all f:JoinGateway | some ControlFlow.f and one f.ControlFlow
+}
+
+//8.2 
+fact MergaGatewayInOut { // não sei porque não consegui por em pointfree
+  all f:MergeGateway | some ControlFlow.f and one f.ControlFlow
+}
+
+
+// 9
+fact EventGatewayIn {
+  all f:EventGateway | f.ControlFlow in MessageEvent + TimerEvent + ReceiveTask
+}
+
+
+// 10 
+// 11
+// 12
 
 
 
