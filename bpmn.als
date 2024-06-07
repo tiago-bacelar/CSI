@@ -309,10 +309,6 @@ fact FactFour {
   no  ControlFlow.StartEvent
   all s: StartEvent | one s.ControlFlow
 }
-// restricao nao tem numero
-//fact StartIsTop { // dá erro
-//  Model.top in StartEvent
-//}
 
 fact FactFive {
   no EndEvent.ControlFlow
