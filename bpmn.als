@@ -188,6 +188,15 @@ fun rtc[S: univ, r: univ -> univ] : univ -> univ {
 	(S -> S) & *r
 }
 
+/////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////// UTILS //////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
+
+pred RestrictFunction[R: univ -> univ, A,B: set univ] {
+	Simple[R&(A->B),B]
+	Entire[R&(A->B),A]
+}
+
 
 /////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////// PROCESS ////////////////////////////////////////
@@ -228,15 +237,11 @@ abstract sig Gateway extends Object {}
 sig ForkGateway extends Gateway {}
 sig JoinGateway extends Gateway {}
 sig XORGateway extends Gateway {
-  Cond: C lone -> Object
+  Cond: C lone -> Object // restricao 1
 }
 sig EventGateway extends Gateway {}
 sig MergeGateway extends Gateway {}
 
-// Se $o_1 "ControlFlow" o_2$ e $o_1 in "XORGateway"$, entÃ£o, $exists c : c "Cond" (o_1, o_2)$
-fact FactOne {
-  all x : XORGateway | x.Cond[C] = x.ControlFlow
-}
 
 /////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////// MODEL //////////////////////////////////////////
@@ -263,6 +268,10 @@ fun HR[m : Model]: Process -> Process {
 
 fact noLooseObjects {
   all o : Object | one objects.o
+}
+
+fact noLooseConditions {
+  all c: C | some x: XORGateway | some x.Cond[c]
 }
 
 fact noLooseProcesses {
@@ -296,7 +305,7 @@ fact HRConnected {
 
 // restricao 2
 fact FactTwo {
-  lone XORGateway.Cond[C]
+  all x : XORGateway | x.Cond[C] = x.ControlFlow
 }
 
 // restricao 3
@@ -306,37 +315,37 @@ fact FactThree {
 
 // restricao 4 
 fact FactFour {
-  no  ControlFlow.StartEvent
-  all s: StartEvent | one s.ControlFlow
+  no ControlFlow.StartEvent
+  RestrictFunction[ControlFlow,StartEvent,Object]
 }
 
 fact FactFive {
   no EndEvent.ControlFlow
-  all e: EndEvent | one ControlFlow.e
+  RestrictFunction[~ControlFlow,EndEvent,Object]
 }
 
 fact FactSix {
-  Function[ControlFlow,Activity,Object]
-  Function[~ControlFlow,Activity,Object]
-  Function[ControlFlow,IntermediateEvent-dom[Excp],Object]
-  Function[~ControlFlow,IntermediateEvent-dom[Excp],Object]
+  RestrictFunction[ControlFlow,Activity,Object]
+  RestrictFunction[~ControlFlow,Activity,Object]
+  RestrictFunction[ControlFlow,IntermediateEvent-dom[Excp],Object]
+  RestrictFunction[~ControlFlow,IntermediateEvent-dom[Excp],Object]
 }
 
 fact FactSeven {
   all g: ForkGateway+XORGateway+EventGateway | #(g.ControlFlow) > 1
-  Function[~ControlFlow,ForkGateway+XORGateway+EventGateway,Object]
+  RestrictFunction[~ControlFlow,ForkGateway+XORGateway+EventGateway,Object]
 }
 
 fact FactEight {
   all g: JoinGateway+MergeGateway | #(ControlFlow.g) > 1
-  Function[ControlFlow,JoinGateway+MergeGateway,Object]
+  RestrictFunction[ControlFlow,JoinGateway+MergeGateway,Object]
 }
 
 fact FactNine {
   EventGateway.ControlFlow in MessageEvent + TimerEvent + ReceiveTask
 }
 
-//Alloy doesn't support higher-order quantification
+//Alloy doesn't support higher-order quantification, but this is irrelevant since the restriction is trivialy satisfied in any finite model
 //fact FactTen {
 //  all g: XORGateway | some order: Object->Object | Linearorder[order,Object]
 //}
@@ -347,4 +356,4 @@ fact FactEleven {
 }
 
 
-run {} for 10 but exactly 1 Process, exactly 1 ForkGateway
+run {} for 8 but exactly 1 Process
