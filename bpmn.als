@@ -15,7 +15,7 @@
 /***********************************************/
 
 /**Id Definition*/
-fun id[S: univ] : univ -> univ {
+fun id[S: set univ] : univ -> univ {
 	(S -> S) & iden
 }
 
@@ -188,15 +188,6 @@ fun rtc[S: univ, r: univ -> univ] : univ -> univ {
 	(S -> S) & *r
 }
 
-/////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////// UTILS //////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////
-
-pred RestrictFunction[R: univ -> univ, A,B: set univ] {
-	Simple[R&(A->B),B]
-	Entire[R&(A->B),A]
-}
-
 
 /////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////// PROCESS ////////////////////////////////////////
@@ -207,6 +198,7 @@ sig C {}
 
 
 abstract sig Object {
+  process: Process,
   ControlFlow: set Object
 }
 
@@ -214,7 +206,7 @@ abstract sig Activity extends Object {}
 sig Task extends Activity {}
 sig ReceiveTask extends Task {}
 sig SubProcInvocation extends Activity {
-  map: disj one Process
+  map: disj one Process // requisito 21 (parte 1)
 }
 
 
@@ -222,7 +214,7 @@ abstract sig Event extends Object {}
 sig StartEvent extends Event {}
 
 abstract sig IntermediateEvent extends Event {
-  Excp: lone Activity
+  Excp: lone Activity // requisito 3
 }
 
 sig MessageEvent extends IntermediateEvent {}
@@ -236,124 +228,161 @@ abstract sig Gateway extends Object {}
 
 sig ForkGateway extends Gateway {}
 sig JoinGateway extends Gateway {}
-sig XORGateway extends Gateway {
-  Cond: C lone -> Object // restricao 1
+sig DataGateway extends Gateway {
+  Cond: C lone -> Object // requisito 1
 }
 sig EventGateway extends Gateway {}
 sig MergeGateway extends Gateway {}
 
 
-/////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////// MODEL //////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////
+sig Process {}
+one sig Top in Process {}
 
 
-sig Process {
-  objects: set Object
-}
-
-
-sig Model {
-  processes: set Process,
-  top: one Process
-}
-
-fun Sdiamond[m : Model]: SubProcInvocation {
-  m.processes.objects & SubProcInvocation
-}
-
-fun HR[m : Model]: Process -> Process {
-  objects.map & m.processes -> m.processes
-}
-
-fact noLooseObjects {
-  all o : Object | one objects.o
-}
-
+// este facto não é estritamente necessário, serve apenas para simplificar os modelos gerados
 fact noLooseConditions {
-  all c: C | some x: XORGateway | some x.Cond[c]
+  all c: C | some g: DataGateway | some g.Cond[c]
 }
 
-fact noLooseProcesses {
-  all p: Process | one processes.p
+/////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////// UTILS //////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
+
+//negation of iden
+fun dif[S: set univ] : S -> S { (S->S) - iden }
+
+pred in0 [S: set Object] { no ControlFlow.S }
+pred out0[S: set Object] { no S.ControlFlow }
+pred in1 [S: set Object] { Function[~ControlFlow&(S->Object),S,Object] }
+pred out1[S: set Object] { Function[ControlFlow&(S->Object),S,Object] }
+pred inN [S: set Object] { ControlFlow.(id[S]) in dif[Object].ControlFlow.(id[S]) }
+pred outN[S: set Object] { id[S].ControlFlow in id[S].ControlFlow.(dif[Object]) }
+
+fun HR: Process -> Process {
+  (~process).map
 }
 
-fact FlowInsideProcess {
-  objects.ControlFlow.~objects in iden
-}
+/////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////// REQUIREMENTS ////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
 
-fact ExcpInsideProcess {
-  objects.Excp.~objects in iden
-}
 
-fact noTopInMap {
-  all m : Model | m.top not in Sdiamond[m].map
-}
-
-fact topInProcesses {
-  all m : Model | m.top in m.processes
-}
-
-fact mapInModel {
-  all m : Model | Sdiamond[m].map in m.processes
-}
-
-fact HRConnected {
-  all m : Model | (m.top).*(HR[m]) = m.processes
+// requisito 2
+fact DataGatewayExitsHaveACondition {
+  all x : DataGateway | x.Cond[C] = x.ControlFlow
 }
 
 
-// restricao 2
-fact FactTwo {
-  all x : XORGateway | x.Cond[C] = x.ControlFlow
+// requisito 4 
+fact StartEventDegrees {
+  in0[StartEvent]
+  out1[StartEvent]
 }
 
-// restricao 3
-fact FactThree {
-  Simple[Excp,IntermediateEvent]
+// requisito 5
+fact EndEventDegrees {
+  in1[EndEvent]
+  out0[EndEvent]
 }
 
-// restricao 4 
-fact FactFour {
-  no ControlFlow.StartEvent
-  RestrictFunction[ControlFlow,StartEvent,Object]
+// requisito 6
+fact ActivityDegrees {
+  in1[Activity]
+  out1[Activity]
 }
 
-fact FactFive {
-  no EndEvent.ControlFlow
-  RestrictFunction[~ControlFlow,EndEvent,Object]
+// requisito 7
+fact IntermediateEventDegrees {
+  in1[IntermediateEvent-dom[Excp]]
+  in0[IntermediateEvent&dom[Excp]]
+  out1[IntermediateEvent]
 }
 
-fact FactSix {
-  RestrictFunction[ControlFlow,Activity,Object]
-  RestrictFunction[~ControlFlow,Activity,Object]
-  RestrictFunction[ControlFlow,IntermediateEvent-dom[Excp],Object]
-  RestrictFunction[~ControlFlow,IntermediateEvent-dom[Excp],Object]
+// requisito 8
+fact ForkGatewayDegrees {
+  in1[ForkGateway]
+  outN[ForkGateway]
 }
 
-fact FactSeven {
-  all g: ForkGateway+XORGateway+EventGateway | #(g.ControlFlow) > 1
-  RestrictFunction[~ControlFlow,ForkGateway+XORGateway+EventGateway,Object]
+// requisito 9
+fact DataGatewayDegrees {
+  in1[DataGateway]
+  outN[DataGateway]
 }
 
-fact FactEight {
-  all g: JoinGateway+MergeGateway | #(ControlFlow.g) > 1
-  RestrictFunction[ControlFlow,JoinGateway+MergeGateway,Object]
+// requisito 10
+fact EventGatewayDegrees {
+  in1[EventGateway]
+  outN[EventGateway]
 }
 
-fact FactNine {
+// requisito 11
+fact JoinGatewayDegrees {
+  inN[JoinGateway]
+  out1[JoinGateway]
+}
+
+// requisito 12
+fact MergeGatewayDegrees {
+  inN[MergeGateway]
+  out1[MergeGateway]
+}
+
+// requisito 13
+fact EventGatewayExits {
   EventGateway.ControlFlow in MessageEvent + TimerEvent + ReceiveTask
 }
 
-//Alloy doesn't support higher-order quantification, but this is irrelevant since the restriction is trivialy satisfied in any finite model
-//fact FactTen {
-//  all g: XORGateway | some order: Object->Object | Linearorder[order,Object]
-//}
+// requisito 14
+fact DataGatewayExitsOrder {
+  //Alloy não suporta quantificações de ordem superior, mas isso não interessa uma vez que este requisito é trivial em modelos finitos
+  //all g: DataGateway | some order: Object->Object | Linearorder[order,Object]
+}
 
-fact FactEleven {  
+// requisito 15
+fact DataGatewayMinExit {
+  //Igual ao requisito anterior
+}
+
+// requisito 16
+fact FlowStart {
+  //Object in (StartEvent+dom[Excp]).*ControlFlow
   Surjective[*ControlFlow & ((StartEvent+dom[Excp])->Object),Object]
-  Entire[*ControlFlow & (Object->EndEvent),Object]
+  //Surjective[*(ControlFlow+~Excp) & (StartEvent->Object),Object]
+}
+
+// requisito 17
+fact FlowEnd {
+  //Object in *ControlFlow.EndEvent
+  Surjective[~*ControlFlow & (EndEvent->Object),Object]
+}
+
+// requisito 18
+fact FlowInsideProcess {
+  ControlFlow in ker[process]
+  Excp in ker[process]
+}
+
+// requisito 19
+fact ConnectedHR {
+  //Top.*HR = Process
+  //*(HR+~HR) = Process->Process
+  Process->Process in *(HR+~HR)
+}
+
+// requisito 20
+fact AcyclicHR {
+  no ^HR & iden
+}
+
+// requisito 21 (parte 2)
+fact MapSurjectiveButTop {
+  Top not in Process.HR
 }
 
 
-run {} for 8 but exactly 1 Process
+run {} for 5
+
+
+
+
