@@ -257,6 +257,7 @@ pred in1 [S: set Object] { Function[~ControlFlow&(S->Object),S,Object] }
 pred out1[S: set Object] { Function[ControlFlow&(S->Object),S,Object] }
 pred inN [S: set Object] { ControlFlow.(id[S]) in dif[Object].ControlFlow.(id[S]) }
 pred outN[S: set Object] { id[S].ControlFlow in id[S].ControlFlow.(dif[Object]) }
+// Não é necessário obrigar pelo menos uma entrada e saída, uma vez que isso é garantido pelos requisitos 16 e 17
 
 fun HR: Process -> Process {
   (~process).map
@@ -382,7 +383,4 @@ fact MapSurjectiveButTop {
 
 
 run {} for 5
-
-
-
 
